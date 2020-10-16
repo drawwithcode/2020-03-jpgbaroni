@@ -25,7 +25,7 @@ class Character {
     this.sprites = [];
     for (var side = 0; side < 2; side++) {
       for (var sp = 0; sp < 8; sp++) {
-        let img = loadImage('assets/images/'+this.name+'/Player '+side+' '+sp+'.png');
+        let img = loadImage('./assets/images/'+this.name+'/Player '+side+' '+sp+'.png');
         this.sprites.push(img);
       }
     }
@@ -85,7 +85,7 @@ class Entity {
 }
 
 function preload(){
-   backimg.push(loadImage('assets/images/back.png'));
+   backimg.push(loadImage('./assets/images/back.png'));
    characters.push(new Character());
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    world1 = new World();
