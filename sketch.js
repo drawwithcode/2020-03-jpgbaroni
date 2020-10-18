@@ -14,7 +14,7 @@ let airresistance = -0.1;
 
 let maxspeed = 4;
 let speedincrement = 0.8;
-let speedjump = 12;
+let speedjump = 8;
 
 const gravity = - 9.81; // gravity acceleration in blocks per second per second
 
@@ -25,10 +25,18 @@ class World { // The Map of the game
     this.name = name;
     this.size = size; // size in blocks
     this.rad = [blocksize*size[0]/2/PI,blocksize*(size[0]/2/PI-size[1])]; // Outer and Inner Radius
-    this.blocks = new Array(size[0]).fill(new Array(size[1]).fill(0)); // create blocks
+    /*this.blocks = new Array(size[0]).fill(new Array(size[1]).fill(0)); // create blocks
     this.blocks.forEach((b) => { // create floor
       b[0] = 1;
-    });
+    });*/
+    this.blocks = [];
+    for (var x = 0; x < size[0]; x++) {
+      let arr = [1];
+      for (var y = 1; y < size[1]; y++) {
+        arr.push(0);
+      }
+      this.blocks.push(arr);
+    }
     this.entities = [];
     this.startingpoint = [4*blocksize,4*blocksize];
   }
@@ -135,9 +143,8 @@ function preload(){
    characters.push(new Character(true));
    characters.push(new Character(false,"guard"));
    //img = loadImage('/assets/images/giorgioinnocenti.png');
-   selworld = new World();
-   characters[0].position = selworld.startingpoint;
-   cameraposition = [selworld.startingpoint[0],-selworld.startingpoint[1]+wDim0[1]/2];
+   selworld = loadJSON("./assets/baseworld.json"); // new World();
+
 }
 
 function drawBackground(backimage) {
@@ -151,15 +158,20 @@ function drawBackground(backimage) {
 
 function drawBlock(x,y,type=1) {
   let pos = [(x+0.5)*blocksize,(y+0.5)*blocksize];
+  stroke(color(75,50,10,255));
   push();
   switch (type) {
+    case 2:
+      fill(color(60,60,60,100));
+      stroke(color(60,60,60,255));
+      break;
     case 69:
       fill(color(200,100,220,255));
+      stroke(color(100,50,100,255));
       break;
     default:
       fill(color(150,100,70,255));
   }
-  stroke(color(75,50,10,255));
   strokeWeight(1.5);
   translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
   rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
@@ -185,8 +197,8 @@ function drawWorld() {
   //rect();
   selworld.blocks.forEach((row, x) => {
     row.forEach((bl, y) => {
-      if (bl == 1) {
-        drawBlock(x,y);
+      if (bl > 0) {
+        drawBlock(x,y,bl);
       }
     });
   });
@@ -210,6 +222,8 @@ function drawChars() { // Draws the characters
 }
 
 function setup() {
+  characters[0].position = selworld.startingpoint;
+  cameraposition = [selworld.startingpoint[0],-selworld.startingpoint[1]+wDim0[1]/2];
   frameRate(fps);
   wDim0 = [windowWidth,windowHeight];
   createCanvas(wDim0[0],wDim0[1]);
@@ -230,8 +244,26 @@ function mouseClicked() {
   //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
 }
 function mousePressed() {
-  //let ypos = selworld.rad[0] - ((mouseX-wDim0[0]/2)^2 + (selworld.rad[1]-(mouseY+cameraposition[1]-wDim0[1]/2)))^2;
-  //let xpos = selworld.rad[0] - ((mouseX-wDim0[0]/2)^2 + (selworld.rad[1]-(mouseY+cameraposition[1]-wDim0[1]/2)))^2;
+  let yrad = ((mouseX-wDim0[0]/2)**2 + (selworld.rad[0]+mouseY-cameraposition[1]-wDim0[1]/2)**2)**0.5;
+  let ypos = floor((selworld.rad[0]-yrad)/blocksize);
+  let xpos = floor((atan((mouseX-wDim0[0]/2)/yrad)*selworld.rad[0] + cameraposition[0])/blocksize);
+
+  if (xpos < 0) {
+    xpos += selworld.size[0];
+  }
+  else if (xpos >= selworld.size[0]) {
+    xpos -= selworld.size[0];
+  }
+  if (ypos < 0) {
+    ypos = 0;
+  }
+  else if (ypos >= selworld.size[1]) {
+    ypos = selworld.size[1] - 1;
+  }
+  if (selworld.blocks[xpos][ypos] == 0)
+    selworld.blocks[xpos][ypos] = 2;
+  else
+    selworld.blocks[xpos][ypos] = 0;
 }
 
 function sign(x) {
@@ -307,7 +339,7 @@ function moveChars() {
 
         let newpos = [ch.position[0]+blocksize*ch.speed[0]/fps, ch.position[1]+blocksize*ch.speed[1]/fps];
 
-        let distancethisframe = ((ch.position[0] - newpos[0])^2 + (ch.position[1] - newpos[1])^2)^0.5;
+        let distancethisframe = ((ch.position[0] - newpos[0])**2 + (ch.position[1] - newpos[1])**2)**0.5;
 
         // TBD Better collision up to last frame, refactor with function
 
