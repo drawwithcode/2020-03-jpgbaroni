@@ -12,7 +12,11 @@ let selworld; // current selected world
 
 let airresistance = -0.1;
 
-const gravity = - 9.81/5; // gravity acceleration in blocks per second per second
+let maxspeed = 4;
+let speedincrement = 0.8;
+let speedjump = 12;
+
+const gravity = - 9.81; // gravity acceleration in blocks per second per second
 
 // axes are cartesian-like
 
@@ -40,6 +44,7 @@ class Character { // Like a player class but cooler
     this.blocks = [2,4]; // Blocks that occupies
     this.hasweight = true;
     this.cursprite = 1; // current sprite index
+    this.currentblocks = [];
     this.loadsprites();
   }
 
@@ -144,10 +149,16 @@ function drawBackground(backimage) {
   }
 }
 
-function drawBlock(x,y) {
+function drawBlock(x,y,type=1) {
   let pos = [(x+0.5)*blocksize,(y+0.5)*blocksize];
   push();
-  fill(color(150,100,70,255));
+  switch (type) {
+    case 69:
+      fill(color(200,100,220,255));
+      break;
+    default:
+      fill(color(150,100,70,255));
+  }
   stroke(color(75,50,10,255));
   strokeWeight(1.5);
   translate(wDim0[0]/2,wDim0[1]-cameraposition[1]-selworld.rad[0]);
@@ -230,84 +241,183 @@ function sign(x) {
   return result;
 }
 
+function findOverBlocks(pos, blsize, graphics = false) { // find the blocks occupied by an entity (position and block size of entity)
+  //from top left to bottom right
+  let blocktopleft =
+  [floor((pos[0]+1)/blocksize-blsize[0]/2),
+  floor((pos[1]-1)/blocksize+blsize[1]/2)];
+  let blockbottomright =
+  [floor((pos[0]-1)/blocksize+blsize[0]/2),
+  floor((pos[1]+1)/blocksize-blsize[1]/2)];
+  let result = [];
+  for (var x = blocktopleft[0]; x <= blockbottomright[0]; x++) {
+    for (var y = blocktopleft[1]; y >= blockbottomright[1]; y--) {
+      let x1 = x, y1 = y;
+      if (x1<0) {
+        x1 = x1+selworld.size[0];
+      }
+      else if (x1 >= selworld.size[0]) {
+        x1 = x1-selworld.size[0];
+      }
+      if (y1<0) {
+        y1 = 0;
+      }
+      else if (y1 > selworld.size[1]) {
+        y1 = selworld.size[1]-1;
+      }
+      result.push([x1,y1]);
+      if (graphics)
+        drawBlock(x1,y1,69);
+    }
+  }
+  return result;
+}
+
+function blockCollision(blocksoccupied) {
+  let result = [false, false, false, false]; //top right bottom left
+  blocksoccupied.forEach((bo, ibo) => {
+    if (selworld.blocks[bo[0]][bo[1]] != 0) {
+      result = [true, true, true, true];
+    }
+  });
+  return result;
+}
+
+function hasBlockUnder(blocksoccupied,ypos) { // Is there a block under the char/entity
+  let result = false;
+  if ((ypos+1) % blocksize < blocksize/2) {
+    blocksoccupied.forEach((bo, ibo) => {
+      if (selworld.blocks[bo[0]][bo[1]-1] != 0) {
+        result = true;
+      }
+    });
+  }
+  return result;
+}
+
 function moveChars() {
   characters.forEach((ch, ic) => {
     if(ch.display) {
-      if (ch.hasweight) { // falling
+      let presentblocks = findOverBlocks(ch.position,ch.blocks);
+      if (ch.hasweight && ! hasBlockUnder(presentblocks,ch.position[1])) { // falling
         ch.speed[1] += airresistance*ch.speed[1]/fps+gravity/fps;
       }
       if(ch.speed[0] != 0 || ch.speed[1] != 0) { // physics
+
         let newpos = [ch.position[0]+blocksize*ch.speed[0]/fps, ch.position[1]+blocksize*ch.speed[1]/fps];
-        if (newpos[0]<0) {
-          newpos[0] += selworld.size[0]*blocksize;
-        }
-        else if (newpos[0]>=selworld.size*blocksize) {
-          newpos[0] -= selworld.size[0]*blocksize;
-        }
 
-        // if enters a full block stops
-        /*
-        let oldblocktopleft = [floor(ch.position[0]/blocksize-ch.blocks[0]/2),floor(ch.position[1]/blocksize+ch.blocks[1]/2)];let newblocktopleft = [floor((ch.position[0]+dpos[0])/blocksize-ch.blocks[0]/2),floor((ch.position[1]+dpos[1])/blocksize+ch.blocks[1]/2)];
-
-        for (let x = oldblocktopleft[0]; x != newblocktopleft[0]; x += sign(newblocktopleft[0]-oldblocktopleft[0])) {
-          for (let y = oldblocktopleft[1]; y != newblocktopleft[1]; y += sign(newblocktopleft[1]-oldblocktopleft[1])) {
-            if (selworld.blocks[x][y] != 0) {
-
-            }
-          }
-        }*/
         let distancethisframe = ((ch.position[0] - newpos[0])^2 + (ch.position[1] - newpos[1])^2)^0.5;
-        let oldblocktopleft = [floor(ch.position[0]/blocksize-ch.blocks[0]/2),floor(ch.position[1]/blocksize+ch.blocks[1]/2)];
 
-        for (let d = distancethisframe%blocksize; d < distancethisframe+blocksize; d+=blocksize) {
-          let newblocktopleft =
-          [floor((ch.position[0]+d*(-ch.position[0]+newpos[0])/distancethisframe)/blocksize-ch.blocks[0]/2),
-          floor((ch.position[1]+d*(-ch.position[1]+newpos[1])/distancethisframe)/blocksize+ch.blocks[1]/2)];
-          for (let x = newblocktopleft[0]; x < newblocktopleft[0]+ch.blocks[0]+1; x++) {
-            for (let y = newblocktopleft[1]; y > newblocktopleft[1]-ch.blocks[1]-1; y--) {
-              let x1 = x, y1 = y;
-              drawBlock(x1,y1);
-              if (x1<0) {
-                x1 = x1+selworld.size[0];
-              }
-              else if (x1 >= selworld.size[0]) {
-                x1 = x1-selworld.size[0];
-              }
-              if (y1<0) {
-                y1 = y1+selworld.size[1];
-              }
-              else if (y1 >= selworld.size[1]) {
-                y1 = y1-selworld.size[1];
-              }
-              if (selworld.blocks[x1][y1] != 0) { //found collision
-                if (newblocktopleft[0] != oldblocktopleft[0]) {
-                  ch.speed[0] = -0.1*ch.speed[0];
-                  newpos[0] = (oldblocktopleft[0]+ch.blocks[0]/2)*blocksize;
-                }
-                if (newblocktopleft[1] != oldblocktopleft[1]) {
-                  ch.speed[1] = -0.1*ch.speed[1];
-                  newpos[1] = (oldblocktopleft[1]-ch.blocks[1]/2)*blocksize;
-                }
-                x = newblocktopleft[0]+ch.blocks[0];
-                break;
-              }
+        // TBD Better collision up to last frame, refactor with function
+
+        if (distancethisframe != 0) {
+          let oldx = ch.position[0], oldy = ch.position[1];
+          for (let d = 0; d < distancethisframe; d+=blocksize) {
+            let newx = ch.position[0]+d*(-ch.position[0]+newpos[0])/distancethisframe; // projection on x
+            let newy = ch.position[1]+d*(-ch.position[1]+newpos[1])/distancethisframe; // projection on y
+            if (newx<0) {
+              newx = newx + selworld.size[0]*blocksize;
             }
+            else if (newx>selworld.size[0]*blocksize) {
+              newx = newx - selworld.size[0]*blocksize;
+            }
+            if (newy<0) {
+              newy = 0;
+            }
+            else if (newy>selworld.size[1]*blocksize) {
+              newy = selworld.size[1]*blocksize;
+            }
+            let futureblocks = findOverBlocks([newx, newy],[ch.blocks[0],ch.blocks[1]]);
+            let willcollide = blockCollision(futureblocks);
+
+            if (willcollide[0] || willcollide[1] || willcollide[2] || willcollide[3]) {
+              ch.speed[0] = 0;//-0.1*ch.speed[0];
+              newpos[0] = oldx;
+              ch.speed[1] = 0;//-0.1*ch.speed[1];
+              newpos[1] = oldy;
+              if (hasBlockUnder(presentblocks,newpos[1]))
+                newpos[1] -= newpos[1]%blocksize;
+              d = distancethisframe+blocksize;
+            }
+            presentblocks = futureblocks;
+            oldx = newx;
+            oldy = newy;
           }
-          oldblocktopleft = newblocktopleft;
-        }
 
-        if (newpos[0]<0) {
-          newpos[0] += selworld.size[0]*blocksize;
-        }
-        else if (newpos[0]>=selworld.size*blocksize) {
-          newpos[0] -= selworld.size[0]*blocksize;
-        }
+          if (newpos[0]<0) {
+            newpos[0] = newpos[0] + selworld.size[0]*blocksize;
+          }
+          else if (newpos[0]>selworld.size[0]*blocksize) {
+            newpos[0] = newpos[0] -selworld.size[0]*blocksize;
+          }
+          if (newpos[1]<0) {
+            newpos[1] = 0;
+          }
+          else if (newpos[1]>selworld.size[1]*blocksize) {
+            newpos[1] = selworld.size[1]*blocksize;
+          }
 
-        ch.position[0] = newpos[0];
-        ch.position[1] = newpos[1];
+          let futureblocks = findOverBlocks(newpos,[ch.blocks[0],ch.blocks[1]]);
+          let willcollide = blockCollision(futureblocks);
+          if (willcollide[0] || willcollide[1] || willcollide[2] || willcollide[3]) {
+            ch.speed[0] = 0;//-0.1*ch.speed[0];
+            newpos[0] = oldx;
+            ch.speed[1] = 0;//-0.1*ch.speed[1];
+            newpos[1] = oldy;
+            if (hasBlockUnder(presentblocks,newpos[1]))
+              newpos[1] -= newpos[1]%blocksize;
+            d = distancethisframe+blocksize;
+          }
+
+          ch.position[0] = newpos[0];
+          cameraposition[0] = ch.position[0];
+          ch.position[1] = newpos[1];
+        }
       }
+      ch.currentblocks = presentblocks;
     }
   });
+}
+
+function collectInputs() {
+  let blockundernow = hasBlockUnder(characters[0].currentblocks,characters[0].position[1]);
+  if (keyIsDown(RIGHT_ARROW)) {
+    if (characters[0].speed[0] < maxspeed) {
+      //characters[0].speed[1] += 2*speedincrement;
+      characters[0].speed[0] += speedincrement;
+    }
+    characters[0].cursprite = int(4*frameCount/fps) % 4;
+  }
+  if (keyIsDown(LEFT_ARROW)) {
+    if (characters[0].speed[0] > -maxspeed)
+      characters[0].speed[0] -= speedincrement;
+    characters[0].cursprite = int(4*frameCount/fps) % 4 + 8;
+  }
+  if (keyIsDown(UP_ARROW)) {
+    if (characters[0].cursprite < 8)
+      characters[0].cursprite = 7;
+    else
+      characters[0].cursprite = 15;
+    if (characters[0].speed[1] < maxspeed && blockundernow){
+      characters[0].speed[1] += speedjump;
+    }
+  }
+  if (keyIsDown(DOWN_ARROW)) {
+    if (characters[0].cursprite < 8)
+      characters[0].cursprite = 6;
+    else
+      characters[0].cursprite = 14;
+    if (characters[0].speed[1] > -maxspeed)
+      characters[0].speed[1] -= speedincrement;
+  }
+
+  if (!keyIsDown(LEFT_ARROW) && !keyIsDown(RIGHT_ARROW)) {
+    characters[0].speed[0] /= 2;
+    if (characters[0].cursprite < 8)
+      characters[0].cursprite = 1;
+    else
+      characters[0].cursprite = 9;
+  }
 }
 
 function draw() {
@@ -318,6 +428,9 @@ function draw() {
     characters[1].sprites.forEach((sp,isp) => {
       image(sp,blocksize*2*isp,450);
     });*/
+    //characters[0].cursprite = int(2*frameCount/fps) % characters[0].sprites.length;
+    collectInputs();
+
     background(color(0));
     drawWorld();
 
