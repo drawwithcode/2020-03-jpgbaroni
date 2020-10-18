@@ -137,7 +137,7 @@ function preload(){
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = new World();
    characters[0].position = selworld.startingpoint;
-   cameraposition = [selworld.startingpoint[0],selworld.startingpoint[1]+wDim0[1]/2];
+   cameraposition = [selworld.startingpoint[0],-selworld.startingpoint[1]+wDim0[1]/2];
 }
 
 function drawBackground(backimage) {
@@ -161,7 +161,7 @@ function drawBlock(x,y,type=1) {
   }
   stroke(color(75,50,10,255));
   strokeWeight(1.5);
-  translate(wDim0[0]/2,wDim0[1]-cameraposition[1]-selworld.rad[0]);
+  translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
   rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
   rect(-blocksize/2,selworld.rad[0]-pos[1]-blocksize/2,blocksize,blocksize);
   pop();/*
@@ -175,7 +175,7 @@ function drawBlock(x,y,type=1) {
 
 function drawWorld() {
   push();
-  translate(wDim0[0]/2,wDim0[1]-cameraposition[1]-selworld.rad[0]);
+  translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
   fill(200);
   ellipse(0,0,selworld.rad[0]*2);
   fill(0);
@@ -194,7 +194,7 @@ function drawWorld() {
 
 function drawsprite(sprite,pos) {
   push();
-  translate(wDim0[0]/2,wDim0[1]-cameraposition[1]-selworld.rad[0]);
+  translate(wDim0[0]/2, wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
   rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
   image(sprite,-sprite.width/2,selworld.rad[0]-pos[1]-sprite.height/2);
   pop();
@@ -230,7 +230,8 @@ function mouseClicked() {
   //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
 }
 function mousePressed() {
-
+  //let ypos = selworld.rad[0] - ((mouseX-wDim0[0]/2)^2 + (selworld.rad[1]-(mouseY+cameraposition[1]-wDim0[1]/2)))^2;
+  //let xpos = selworld.rad[0] - ((mouseX-wDim0[0]/2)^2 + (selworld.rad[1]-(mouseY+cameraposition[1]-wDim0[1]/2)))^2;
 }
 
 function sign(x) {
@@ -372,6 +373,12 @@ function moveChars() {
           ch.position[0] = newpos[0];
           cameraposition[0] = ch.position[0];
           ch.position[1] = newpos[1];
+          if (ch.position[1] > cameraposition[1]) {
+            cameraposition[1] = ch.position[1];
+          }
+          else if (ch.position[1] < cameraposition[1]) {
+            cameraposition[1] = ch.position[1];
+          }
         }
       }
       ch.currentblocks = presentblocks;
@@ -380,20 +387,24 @@ function moveChars() {
 }
 
 function collectInputs() {
+  let keydright = keyIsDown(RIGHT_ARROW) || keyIsDown(68);
+  let keydleft = keyIsDown(LEFT_ARROW) || keyIsDown(65);
+  let keydup = keyIsDown(UP_ARROW) || keyIsDown(87);
+  let keyddown = keyIsDown(DOWN_ARROW) || keyIsDown(83);
   let blockundernow = hasBlockUnder(characters[0].currentblocks,characters[0].position[1]);
-  if (keyIsDown(RIGHT_ARROW)) {
+  if (keydright) {
     if (characters[0].speed[0] < maxspeed) {
       //characters[0].speed[1] += 2*speedincrement;
       characters[0].speed[0] += speedincrement;
     }
     characters[0].cursprite = int(4*frameCount/fps) % 4;
   }
-  if (keyIsDown(LEFT_ARROW)) {
+  if (keydleft) {
     if (characters[0].speed[0] > -maxspeed)
       characters[0].speed[0] -= speedincrement;
     characters[0].cursprite = int(4*frameCount/fps) % 4 + 8;
   }
-  if (keyIsDown(UP_ARROW)) {
+  if (keydup) {
     if (characters[0].cursprite < 8)
       characters[0].cursprite = 7;
     else
@@ -402,7 +413,7 @@ function collectInputs() {
       characters[0].speed[1] += speedjump;
     }
   }
-  if (keyIsDown(DOWN_ARROW)) {
+  if (keyddown) {
     if (characters[0].cursprite < 8)
       characters[0].cursprite = 6;
     else
@@ -411,7 +422,7 @@ function collectInputs() {
       characters[0].speed[1] -= speedincrement;
   }
 
-  if (!keyIsDown(LEFT_ARROW) && !keyIsDown(RIGHT_ARROW)) {
+  if (!keydright && !keydleft && !keydup && !keyddown) {
     characters[0].speed[0] /= 2;
     if (characters[0].cursprite < 8)
       characters[0].cursprite = 1;
