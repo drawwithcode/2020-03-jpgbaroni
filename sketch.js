@@ -12,11 +12,15 @@ let selworld; // current selected world
 
 let airresistance = -0.1;
 
-let maxspeed = 4;
-let speedincrement = 0.8;
+let maxspeed = 8;
+let speedincrement = 1;
 let speedjump = 8;
 
-const gravity = - 9.81; // gravity acceleration in blocks per second per second
+let regenHealth = 0.1/60; // Health regained per second
+
+const gravity = - 9.81*2; // gravity acceleration in blocks per second per second
+
+let deathScreen = 0; // number of seconds to show the death screen for
 
 // axes are cartesian-like
 
@@ -43,16 +47,18 @@ class World { // The Map of the game
 }
 
 class Character { // Like a player class but cooler
-  constructor(display, name = "giorgioinnocenti") {
+  constructor(display, name = "giorgioinnocenti", position = [0,0]) {
     this.name = name;
     this.sprites = [];
+    this.head = new Image();
     this.display = display;
-    this.position = [0,0]; // Center of the character
+    this.position = position; // Center of the character
     this.speed = [0,1]; // blocks per second
     this.blocks = [2,4]; // Blocks that occupies
     this.hasweight = true;
     this.cursprite = 1; // current sprite index
     this.currentblocks = [];
+    this.life = 1; // life max 1, at 0 death
     this.loadsprites();
   }
 
@@ -69,12 +75,13 @@ class Character { // Like a player class but cooler
   /* DO NOT READ THE FOLLOWING, VERY BORING*/
   colorpixels(playercolor=[106,53,53]) { // Make transparency and colours the characters
     let spritesn = [];
+    let scaling;
     this.sprites.forEach((img) => {
       let imgnew = createImage(blocksize*2, blocksize*4);
       img.loadPixels();
       imgnew.loadPixels();
 
-      let scaling = blocksize/img.width*2;
+      scaling = blocksize/img.width*2;
       function paintbigsquare(x,y,c) {
         for (var dx = 0; dx < scaling; dx++) {
           for (var dy = 0; dy < scaling; dy++) {
@@ -119,6 +126,18 @@ class Character { // Like a player class but cooler
     }
     this.loadsprites();*/
     this.sprites = spritesn;
+
+    // builds just the top square
+    this.head = createImage(this.sprites[0].width/scaling, this.sprites[0].width/scaling);
+    this.head.loadPixels();
+    this.sprites[0].loadPixels();
+    for (let i = 0; i < this.head.width; i++) {
+      for (let j = 0; j < this.head.height; j++) {
+        let pix = this.sprites[0].get(i*scaling, j*scaling);
+        this.head.set(i,j,color(pix[0],pix[1],pix[2],pix[3]));
+      }
+    }
+    this.head.updatePixels();
   }
 }
 
@@ -141,7 +160,7 @@ function preload(){
    document.body.style.overflow = "hidden";
    backimg.push(loadImage('./assets/images/back.png'));
    characters.push(new Character(true));
-   characters.push(new Character(false,"guard"));
+   characters.push(new Character(true,"guard",[888,555]));
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = loadJSON("./assets/baseworld.json"); // new World();
 
@@ -179,7 +198,7 @@ function drawBlock(x,y,type=1) {
     push();
     switch (type) {
       case 2:
-        fill(color(60,60,60,100));
+        fill(color(90,90,90,150));
         stroke(color(60,60,60,255));
         break;
       case 69:
@@ -187,7 +206,8 @@ function drawBlock(x,y,type=1) {
         stroke(color(100,50,100,255));
         break;
       default:
-        fill(color(150,100,70,255));
+        fill(color(50,100,30,150));
+        stroke(color(50,100,30,255));
     }
     strokeWeight(1.5);
     translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
@@ -205,13 +225,23 @@ function drawBlock(x,y,type=1) {
 }
 
 function drawWorld() {
+  background(color(0));
+
   push();
+  noStroke();
+  translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-blocksize*selworld.size[1]/2);
+  for(let rad = wDim0[0]+wDim0[1]; rad > 0; rad -= (wDim0[0]+wDim0[1])/12) {
+    fill(20,20,20+50*(1-rad/(wDim0[0]+wDim0[1])));
+    ellipse(0,0,rad*(1+0.1*sin(rad/5+frameCount/50)));
+  }
+  pop();
+  push();
+  noStroke();
   translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
-  fill(200);
-  ellipse(0,0,selworld.rad[0]*2);
+  //fill(200);
+  //ellipse(0,0,selworld.rad[0]*2);
   fill(0);
   ellipse(0,0,selworld.rad[1]*2);
-
   pop();
   //rect();
   selworld.blocks.forEach((row, x) => {
@@ -234,6 +264,7 @@ function drawsprite(sprite,pos) {
 function drawChars() { // Draws the characters
   characters.forEach((ch) => {
     if(ch.display) {
+      //findOverBlocks(ch.position,ch.blocks,true);
       drawsprite(ch.sprites[ch.cursprite],ch.position);
     }
   });
@@ -241,7 +272,7 @@ function drawChars() { // Draws the characters
 }
 
 function setup() {
-  characters[0].position = selworld.startingpoint;
+  characters[0].position = [selworld.startingpoint[0],selworld.startingpoint[1]];
   cameraposition = [selworld.startingpoint[0],-selworld.startingpoint[1]+wDim0[1]/2];
   frameRate(fps);
   wDim0 = [windowWidth,windowHeight];
@@ -251,6 +282,7 @@ function setup() {
   //soundtrack = loadSound('Catch Up - Dan Lebowitz.mp3');
   noStroke();
   angleMode(RADIANS);
+  textFont("GrenzeGotisch");
 }
 
 function windowResized() {
@@ -335,6 +367,29 @@ function blockCollision(blocksoccupied) {
   return result;
 }
 
+function hasBlockWhere(blocksoccupied,pos) { // Is there a block under the char/entity
+  let result = [false,false,false,false];
+  let ypos = pos[1];
+  let xpos = pos[0];
+  if ((ypos+1) % blocksize < blocksize/2) {
+    blocksoccupied.forEach((bo, ibo) => {
+      if (selworld.blocks[bo[0]][bo[1]+1] != 0) {
+        result[0] = true;
+      }
+      if (selworld.blocks[bo[0]+1][bo[1]] != 0) {
+        result[1] = true;
+      }
+      if (selworld.blocks[bo[0]][bo[1]-1] != 0) {
+        result[2] = true;
+      }
+      if (selworld.blocks[bo[0]-1][bo[1]] != 0) {
+        result[3] = true;
+      }
+    });
+  }
+  return result;
+}
+
 function hasBlockUnder(blocksoccupied,ypos) { // Is there a block under the char/entity
   let result = false;
   if ((ypos+1) % blocksize < blocksize/2) {
@@ -388,7 +443,19 @@ function moveChars() {
               ch.speed[1] = 0;//-0.1*ch.speed[1];
               newpos[1] = oldy;
               if (hasBlockUnder(presentblocks,newpos[1]))
-                newpos[1] = round(newpos[1]-newpos[1]%blocksize);
+                newpos[1] = round(newpos[1]/blocksize)*blocksize;
+              d = distancethisframe+blocksize;
+              /*newpos[0] = oldx;
+              newpos[1] = oldy;
+              if (hasBlockUnder(presentblocks,newpos[1]))
+                newpos[1] = round(newpos[1]/blocksize)*blocksize;
+              let blockwhere = hasBlockWhere(presentblocks,newpos);
+              if (blockwhere[1] || blockwhere[3]) {
+                ch.speed[0] = 0;//-0.1*ch.speed[0];
+              }
+              if (blockwhere[0] || blockwhere[2]) {
+                ch.speed[1] = 0;//-0.1*ch.speed[0];
+              }*/
               d = distancethisframe+blocksize;
             }
             presentblocks = futureblocks;
@@ -402,8 +469,11 @@ function moveChars() {
           else if (newpos[0]>selworld.size[0]*blocksize) {
             newpos[0] = newpos[0] -selworld.size[0]*blocksize;
           }
-          if (newpos[1]<0) {
-            newpos[1] = 0;
+          if (newpos[1]<-1000) {
+            newpos[1] = -1000;
+            if (ch.life > 0) {
+              ch.life = 0;
+            }
           }
           else if (newpos[1]>selworld.size[1]*blocksize) {
             newpos[1] = selworld.size[1]*blocksize;
@@ -417,24 +487,36 @@ function moveChars() {
             ch.speed[1] = 0;//-0.1*ch.speed[1];
             newpos[1] = oldy;
             if (hasBlockUnder(presentblocks,newpos[1]))
-              newpos[1] = round(newpos[1]-newpos[1]%blocksize);
+              newpos[1] = round(newpos[1]/blocksize)*blocksize;
             d = distancethisframe+blocksize;
           }
 
           ch.position[0] = newpos[0];
-          cameraposition[0] = ch.position[0];
           ch.position[1] = newpos[1];
-          if (ch.position[1] > cameraposition[1]) {
-            cameraposition[1] = ch.position[1];
-          }
-          else if (ch.position[1] < cameraposition[1]) {
-            cameraposition[1] = ch.position[1];
-          }
+
         }
       }
       ch.currentblocks = presentblocks;
     }
   });
+  if (characters[0].display) {
+    cameraposition[0] = characters[0].position[0];
+    if (characters[0].position[1] > cameraposition[1]) {
+      cameraposition[1] = characters[0].position[1];
+    }
+    else if (characters[0].position[1] < cameraposition[1]) {
+      cameraposition[1] = characters[0].position[1];
+    }
+  }
+  else {
+    if(abs(mouseX-wDim0[0]/2)>wDim0[0]/3)
+      cameraposition[0] += (mouseX - wDim0[0]/2)/fps;
+    if(abs(mouseY-wDim0[1]/2)>wDim0[1]/3)
+      cameraposition[1] += (-mouseY + wDim0[1]/2)/fps;
+    if (cameraposition[1] > selworld.size[1]*blocksize)
+      cameraposition[1] = selworld.size[1]*blocksize;
+  }
+
 }
 
 function collectInputs() {
@@ -444,14 +526,16 @@ function collectInputs() {
   let keyddown = keyIsDown(DOWN_ARROW) || keyIsDown(83);
   let blockundernow = hasBlockUnder(characters[0].currentblocks,characters[0].position[1]);
   if (keydright) {
-    if (characters[0].speed[0] < maxspeed) {
-      //characters[0].speed[1] += 2*speedincrement;
+    if (characters[0].speed[0] == 0)
+      characters[0].speed[0] += maxspeed/2;
+    else if (characters[0].speed[0] < maxspeed)
       characters[0].speed[0] += speedincrement;
-    }
     characters[0].cursprite = int(4*frameCount/fps) % 4;
   }
   if (keydleft) {
-    if (characters[0].speed[0] > -maxspeed)
+    if (characters[0].speed[0] == 0)
+      characters[0].speed[0] -= maxspeed/2;
+    else if (characters[0].speed[0] > -maxspeed)
       characters[0].speed[0] -= speedincrement;
     characters[0].cursprite = int(4*frameCount/fps) % 4 + 8;
   }
@@ -482,6 +566,52 @@ function collectInputs() {
   }
 }
 
+function drawStats() {
+
+  if (deathScreen > 0) {
+    textAlign(CENTER,CENTER);
+    textSize(150 - 10*deathScreen/fps);
+    fill(255,255,255,100 + 20*deathScreen/fps);
+    stroke(0,0,0,100 + 20*deathScreen/fps);
+    text("Death is Here", wDim0[0]/2, wDim0[1]/2);
+    deathScreen--;
+  }
+
+  push();
+  translate(0,wDim0[1]-80);
+  //textFont("GrenzeGotisch");
+  textAlign(RIGHT,TOP);
+  textSize(20);
+  fill(255);
+  stroke(0);
+  text("Health", 120, 0);
+  let xstartbar = 128+characters[0].head.width;
+  noStroke();
+  fill(0);
+  rect(xstartbar-4,5,108,10);
+  fill(200-characters[0].life*200,characters[0].life*400,20);
+  rect(xstartbar,7,100*characters[0].life,6);
+  image(characters[0].head,128,8-characters[0].head.height/2);
+  pop();
+}
+
+function updateWorld() {
+  characters.forEach((ch, ich) => {
+    if (ch.life > 1) {
+      ch.life = 1;
+    }
+    else if (ch.life <= 0 && ch.display) {
+      ch.life = 0;
+      ch.display = false;
+      deathScreen = 5*fps;
+    }
+    else if (ch.life > 0) {
+      ch.life += regenHealth;
+    }
+  });
+
+}
+
 function draw() {
     /*drawBackground(backimg[0]);
     characters[0].sprites.forEach((sp,isp) => {
@@ -493,9 +623,14 @@ function draw() {
     //characters[0].cursprite = int(2*frameCount/fps) % characters[0].sprites.length;
     collectInputs();
 
-    background(color(0));
+    moveChars();
+
     drawWorld();
 
-    moveChars();
+    if (frameCount%fps == 0) // every second updates things in the world
+      updateWorld();
+
     drawChars();
+
+    drawStats();
 }
