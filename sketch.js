@@ -156,27 +156,46 @@ function drawBackground(backimage) {
   }
 }
 
-function drawBlock(x,y,type=1) {
-  let pos = [(x+0.5)*blocksize,(y+0.5)*blocksize];
-  stroke(color(75,50,10,255));
-  push();
-  switch (type) {
-    case 2:
-      fill(color(60,60,60,100));
-      stroke(color(60,60,60,255));
-      break;
-    case 69:
-      fill(color(200,100,220,255));
-      stroke(color(100,50,100,255));
-      break;
-    default:
-      fill(color(150,100,70,255));
+function blockInScreen(x,y) {
+  let result = true;
+  let xmin = (cameraposition[0]-1.2*wDim0[0]/2)/blocksize;
+  let xmax = (cameraposition[0]+1.2*wDim0[0]/2)/blocksize;
+  if (x < xmin || x > xmax) {
+    result = false;
   }
-  strokeWeight(1.5);
-  translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
-  rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
-  rect(-blocksize/2,selworld.rad[0]-pos[1]-blocksize/2,blocksize,blocksize);
-  pop();/*
+  if (xmin < 0 && x > xmin + selworld.size[0]) {
+    result = true;
+  }
+  if (xmax >= selworld.size[0] && x < xmax - selworld.size[0]) {
+    result = true;
+  }
+  return result;
+}
+
+function drawBlock(x,y,type=1) {
+  if (blockInScreen(x,y)) {
+    let pos = [(x+0.5)*blocksize,(y+0.5)*blocksize];
+    stroke(color(75,50,10,255));
+    push();
+    switch (type) {
+      case 2:
+        fill(color(60,60,60,100));
+        stroke(color(60,60,60,255));
+        break;
+      case 69:
+        fill(color(200,100,220,255));
+        stroke(color(100,50,100,255));
+        break;
+      default:
+        fill(color(150,100,70,255));
+    }
+    strokeWeight(1.5);
+    translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
+    rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
+    rect(-blocksize/2,selworld.rad[0]-pos[1]-blocksize/2,blocksize,blocksize);
+    pop();
+  }
+  /*
   beginShape();
   vertex(30, 20);
   vertex(85, 20);
@@ -369,7 +388,7 @@ function moveChars() {
               ch.speed[1] = 0;//-0.1*ch.speed[1];
               newpos[1] = oldy;
               if (hasBlockUnder(presentblocks,newpos[1]))
-                newpos[1] -= newpos[1]%blocksize;
+                newpos[1] = round(newpos[1]-newpos[1]%blocksize);
               d = distancethisframe+blocksize;
             }
             presentblocks = futureblocks;
@@ -398,7 +417,7 @@ function moveChars() {
             ch.speed[1] = 0;//-0.1*ch.speed[1];
             newpos[1] = oldy;
             if (hasBlockUnder(presentblocks,newpos[1]))
-              newpos[1] -= newpos[1]%blocksize;
+              newpos[1] = round(newpos[1]-newpos[1]%blocksize);
             d = distancethisframe+blocksize;
           }
 
