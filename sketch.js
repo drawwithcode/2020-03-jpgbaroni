@@ -16,11 +16,17 @@ let maxspeed = 8;
 let speedincrement = 1;
 let speedjump = 8;
 
-let regenHealth = 0.1/60; // Health regained per second
+let regenHealth = 0.2/60; // Health regained per second
+let attacktime = 0.4;
+let attackrange = 200;
 
 const gravity = - 9.81*2; // gravity acceleration in blocks per second per second
 
 let deathScreen = 0; // number of seconds to show the death screen for
+
+let jpressed = false;
+
+let proMode = false; // pro mode: edit map
 
 // axes are cartesian-like
 
@@ -47,7 +53,7 @@ class World { // The Map of the game
 }
 
 class Character { // Like a player class but cooler
-  constructor(display, name = "giorgioinnocenti", position = [0,0]) {
+  constructor(display, name = "giorgioinnocenti", position = [0,0], isAI = false, attackdamage = -0.2) {
     this.name = name;
     this.sprites = [];
     this.head = new Image();
@@ -59,6 +65,9 @@ class Character { // Like a player class but cooler
     this.cursprite = 1; // current sprite index
     this.currentblocks = [];
     this.life = 1; // life max 1, at 0 death
+    this.isAI = isAI;
+    this.attack = 0; // if it is attacking > 0
+    this.attackdamage = attackdamage; // damage per attack
     this.loadsprites();
   }
 
@@ -160,7 +169,17 @@ function preload(){
    document.body.style.overflow = "hidden";
    backimg.push(loadImage('./assets/images/back.png'));
    characters.push(new Character(true));
-   characters.push(new Character(true,"guard",[888,555]));
+   characters.push(new Character(true,"guard",[888,555],true,-0.1));
+   characters.push(new Character(true,"guard",[1940,555],true,-0.1));
+   characters.push(new Character(true,"guard",[3120,555],true,-0.1));
+   characters.push(new Character(true,"guard",[4150,555],true,-0.1));
+   characters.push(new Character(true,"guard",[7010,450],true,-0.1));
+   for (var i = 0; i < 6; i++) {
+     characters.push(new Character(true,"guard",[8400,450],true,-0.1));
+   }
+   for (var i = 0; i < 4; i++) {
+     characters.push(new Character(true,"guard",[8400,450],true,-0.1));
+   }
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = loadJSON("./assets/baseworld.json"); // new World();
 
@@ -277,8 +296,9 @@ function setup() {
   frameRate(fps);
   wDim0 = [windowWidth,windowHeight];
   createCanvas(wDim0[0],wDim0[1]);
-  characters[0].colorpixels();
-  characters[1].colorpixels();
+  characters.forEach((ch, ich) => {
+    ch.colorpixels();
+  });
   //soundtrack = loadSound('Catch Up - Dan Lebowitz.mp3');
   noStroke();
   angleMode(RADIANS);
@@ -295,26 +315,32 @@ function mouseClicked() {
   //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
 }
 function mousePressed() {
-  let yrad = ((mouseX-wDim0[0]/2)**2 + (selworld.rad[0]+mouseY-cameraposition[1]-wDim0[1]/2)**2)**0.5;
-  let ypos = floor((selworld.rad[0]-yrad)/blocksize);
-  let xpos = floor((atan((mouseX-wDim0[0]/2)/yrad)*selworld.rad[0] + cameraposition[0])/blocksize);
+  if (proMode) {
+    let yrad = ((mouseX-wDim0[0]/2)**2 + (selworld.rad[0]+mouseY-cameraposition[1]-wDim0[1]/2)**2)**0.5;
+    let ypos = floor((selworld.rad[0]-yrad)/blocksize);
+    let xpos = floor((atan((mouseX-wDim0[0]/2)/yrad)*selworld.rad[0] + cameraposition[0])/blocksize);
 
-  if (xpos < 0) {
-    xpos += selworld.size[0];
+    if (xpos < 0) {
+      xpos += selworld.size[0];
+    }
+    else if (xpos >= selworld.size[0]) {
+      xpos -= selworld.size[0];
+    }
+    if (ypos < 0) {
+      ypos = 0;
+    }
+    else if (ypos >= selworld.size[1]) {
+      ypos = selworld.size[1] - 1;
+    }
+    if (selworld.blocks[xpos][ypos] == 0)
+      selworld.blocks[xpos][ypos] = 2;
+    else
+      selworld.blocks[xpos][ypos] = 0;
   }
-  else if (xpos >= selworld.size[0]) {
-    xpos -= selworld.size[0];
-  }
-  if (ypos < 0) {
-    ypos = 0;
-  }
-  else if (ypos >= selworld.size[1]) {
-    ypos = selworld.size[1] - 1;
-  }
-  if (selworld.blocks[xpos][ypos] == 0)
-    selworld.blocks[xpos][ypos] = 2;
-  else
-    selworld.blocks[xpos][ypos] = 0;
+  characters[0].attack = attacktime*fps;
+  characters[0].cursprite = 4;
+  if(mouseX < wDim0[0]/2)
+    characters[0].cursprite = 12;
 }
 
 function sign(x) {
@@ -400,6 +426,10 @@ function hasBlockUnder(blocksoccupied,ypos) { // Is there a block under the char
     });
   }
   return result;
+}
+
+function l2norm(p1,p2) {
+  return ((p1[0]-p2[0])**2+(p1[0]-p2[0])**2)**0.5;
 }
 
 function moveChars() {
@@ -497,7 +527,69 @@ function moveChars() {
         }
       }
       ch.currentblocks = presentblocks;
-    }
+
+      // Updates sprites
+      if (ch.speed[0] > 0)
+        ch.cursprite = int(4*frameCount/fps) % 4;
+      if (ch.speed[0] < 0)
+        ch.cursprite = int(4*frameCount/fps) % 4 + 8;
+      if (ch.speed[1] > 0) {
+        if (ch.cursprite < 8)
+          ch.cursprite = 7;
+        else
+          ch.cursprite = 15;
+        }
+      }
+      if (ch.speed[1] < 0) {
+        if (ch.cursprite < 8)
+          ch.cursprite = 6;
+        else
+          ch.cursprite = 14;
+      }
+      if (ch.speed[0] == 0 && ch.speed[1] == 0) {
+        if (ch.cursprite < 8)
+          ch.cursprite = 1;
+        else
+          ch.cursprite = 9;
+      }
+
+      // attack stuff
+      if (ch.attack > 0 && ch.life > 0) {
+        let side = 8;
+        if (ch.cursprite < 8)
+          side = 0;
+
+        if (ch.attack > attacktime*fps/2)
+          ch.cursprite = 4+side;
+        else
+          ch.cursprite = 5+side;
+
+        ch.attack--;
+
+        characters.forEach((ch2, ich2) => {
+          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange && ch2.life > 0 && !(ich2 == 0 && proMode)) {
+            ch2.life += ch.attackdamage/(attacktime*fps);
+          }
+        });
+
+      }
+
+      // AI stuff
+      if (ch.isAI && frameCount%(fps/2) == 0 && ch.life > 0) {
+        ch.speed[0] += random(-0.5,0.5);
+        if (random(0,5)<1)
+          ch.speed[1] += speedjump*random(0,1);
+
+        characters.forEach((ch2, ich2) => {
+          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange*3) {
+            ch.speed[0] += ch2.position[0] - ch.position[0];
+            if (abs(ch.speed[0])> maxspeed)
+              ch.speed[0] = maxspeed*ch.speed[0]/abs(ch.speed[0]);
+            if (ch.attack <= 0)
+              ch.attack = attacktime*fps;
+          }
+        });
+      }
   });
   if (characters[0].display) {
     cameraposition[0] = characters[0].position[0];
@@ -530,39 +622,41 @@ function collectInputs() {
       characters[0].speed[0] += maxspeed/2;
     else if (characters[0].speed[0] < maxspeed)
       characters[0].speed[0] += speedincrement;
-    characters[0].cursprite = int(4*frameCount/fps) % 4;
+    //characters[0].cursprite = int(4*frameCount/fps) % 4;
   }
   if (keydleft) {
     if (characters[0].speed[0] == 0)
       characters[0].speed[0] -= maxspeed/2;
     else if (characters[0].speed[0] > -maxspeed)
       characters[0].speed[0] -= speedincrement;
-    characters[0].cursprite = int(4*frameCount/fps) % 4 + 8;
+    //characters[0].cursprite = int(4*frameCount/fps) % 4 + 8;
   }
   if (keydup) {
-    if (characters[0].cursprite < 8)
+    /*if (characters[0].cursprite < 8)
       characters[0].cursprite = 7;
     else
-      characters[0].cursprite = 15;
+      characters[0].cursprite = 15;*/
     if (characters[0].speed[1] < maxspeed && blockundernow){
       characters[0].speed[1] += speedjump;
     }
   }
   if (keyddown) {
-    if (characters[0].cursprite < 8)
+    /*if (characters[0].cursprite < 8)
       characters[0].cursprite = 6;
     else
-      characters[0].cursprite = 14;
+      characters[0].cursprite = 14;*/
     if (characters[0].speed[1] > -maxspeed)
       characters[0].speed[1] -= speedincrement;
   }
 
   if (!keydright && !keydleft && !keydup && !keyddown) {
     characters[0].speed[0] /= 2;
-    if (characters[0].cursprite < 8)
+    if (abs(characters[0].speed[0]) < 0.05)
+      characters[0].speed[0] = 0;
+    /*if (characters[0].cursprite < 8)
       characters[0].cursprite = 1;
     else
-      characters[0].cursprite = 9;
+      characters[0].cursprite = 9;*/
   }
 }
 
@@ -573,7 +667,7 @@ function drawStats() {
     textSize(150 - 10*deathScreen/fps);
     fill(255,255,255,100 + 20*deathScreen/fps);
     stroke(0,0,0,100 + 20*deathScreen/fps);
-    text("Death is Here", wDim0[0]/2, wDim0[1]/2);
+    text("You Died", wDim0[0]/2, wDim0[1]/2);
     deathScreen--;
   }
 
@@ -603,13 +697,27 @@ function updateWorld() {
     else if (ch.life <= 0 && ch.display) {
       ch.life = 0;
       ch.display = false;
-      deathScreen = 5*fps;
+      if (ich == 0) {
+        deathScreen = 5*fps;
+      }
     }
     else if (ch.life > 0) {
       ch.life += regenHealth;
     }
   });
 
+}
+
+function keyPressed() {
+  if (keyCode == 80 && jpressed == true) { //j
+    proMode = !proMode;
+  }
+  if (keyCode == 74) { //j
+    jpressed = true;
+  }
+  else {
+    jpressed = false;
+  }
 }
 
 function draw() {
