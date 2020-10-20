@@ -26,6 +26,7 @@ let deathScreen = 0; // number of seconds to show the death screen for
 
 let jpressed = false;
 
+let selectedblocktype = 2; // blocktype to edit the map with
 let proMode = false; // pro mode: edit map
 
 // axes are cartesian-like
@@ -53,7 +54,7 @@ class World { // The Map of the game
 }
 
 class Character { // Like a player class but cooler
-  constructor(display, name = "giorgioinnocenti", position = [0,0], isAI = false, attackdamage = -0.2) {
+  constructor(display, name = "giorgioinnocenti", position = [0,0], isAI = false, attackdamage = -0.2, hasSprites = []) {
     this.name = name;
     this.sprites = [];
     this.head = new Image();
@@ -68,7 +69,12 @@ class Character { // Like a player class but cooler
     this.isAI = isAI;
     this.attack = 0; // if it is attacking > 0
     this.attackdamage = attackdamage; // damage per attack
-    this.loadsprites();
+    if (hasSprites.length == 0) {
+      this.loadsprites();
+    }
+    else {
+      this.sprites = hasSprites;
+    }
   }
 
   loadsprites() { // Loading of the sprites from files, must be performed in the preload
@@ -170,16 +176,6 @@ function preload(){
    backimg.push(loadImage('./assets/images/back.png'));
    characters.push(new Character(true));
    characters.push(new Character(true,"guard",[888,555],true,-0.1));
-   characters.push(new Character(true,"guard",[1940,555],true,-0.1));
-   characters.push(new Character(true,"guard",[3120,555],true,-0.1));
-   characters.push(new Character(true,"guard",[4150,555],true,-0.1));
-   characters.push(new Character(true,"guard",[7010,450],true,-0.1));
-   for (var i = 0; i < 6; i++) {
-     characters.push(new Character(true,"guard",[8400,450],true,-0.1));
-   }
-   for (var i = 0; i < 4; i++) {
-     characters.push(new Character(true,"guard",[8400,450],true,-0.1));
-   }
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = loadJSON("./assets/baseworld.json"); // new World();
 
@@ -216,15 +212,43 @@ function drawBlock(x,y,type=1) {
     stroke(color(75,50,10,255));
     push();
     switch (type) {
-      case 2:
+      case 2:  // Cement, gray
         fill(color(90,90,90,150));
         stroke(color(60,60,60,255));
         break;
-      case 69:
+      case 3:  // Yellow
+        fill(color(220,190,10,200));
+        stroke(color(200,180,10,255));
+        break;
+      case 4:  // Orange
+        fill(color(255,108,0,200));
+        stroke(color(200,100,0,255));
+        break;
+      case 5:  // Red
+        fill(color(200,20,10,200));
+        stroke(color(170,10,5,255));
+        break;
+      case 6:  // whitish
+        fill(color(200,200,200,200));
+        stroke(color(200,200,200,255));
+        break;
+      case 7:  // Blue
+        fill(color(0,0,255,255));
+        stroke(color(0,0,200,255));
+        break;
+      case 8:  // Brown
+        fill(color(160,100,44,200));
+        stroke(color(160,100,44,255));
+        break;
+      case 9:  // Black
+        fill(color(0,0,0,200));
+        stroke(color(0,0,0,255));
+        break;
+      case 69:  // For coding 69: fuchsia
         fill(color(200,100,220,255));
         stroke(color(100,50,100,255));
         break;
-      default:
+      default:  // Default or 1: green
         fill(color(50,100,30,150));
         stroke(color(50,100,30,255));
     }
@@ -299,6 +323,16 @@ function setup() {
   characters.forEach((ch, ich) => {
     ch.colorpixels();
   });
+  characters.push(new Character(true,"guard",[1940,555],true,-0.1,characters[1].sprites));
+  characters.push(new Character(true,"guard",[3120,555],true,-0.1,characters[1].sprites));
+  characters.push(new Character(true,"guard",[4150,555],true,-0.1,characters[1].sprites));
+  characters.push(new Character(true,"guard",[6910,450],true,-0.1,characters[1].sprites));
+  for (var i = 0; i < 6; i++) {
+    characters.push(new Character(true,"guard",[8400,450],true,-0.1,characters[1].sprites));
+  }
+  for (var i = 0; i < 4; i++) {
+    characters.push(new Character(true,"guard",[8400,450],true,-0.1,characters[1].sprites));
+  }
   //soundtrack = loadSound('Catch Up - Dan Lebowitz.mp3');
   noStroke();
   angleMode(RADIANS);
@@ -315,28 +349,6 @@ function mouseClicked() {
   //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
 }
 function mousePressed() {
-  if (proMode) {
-    let yrad = ((mouseX-wDim0[0]/2)**2 + (selworld.rad[0]+mouseY-cameraposition[1]-wDim0[1]/2)**2)**0.5;
-    let ypos = floor((selworld.rad[0]-yrad)/blocksize);
-    let xpos = floor((atan((mouseX-wDim0[0]/2)/yrad)*selworld.rad[0] + cameraposition[0])/blocksize);
-
-    if (xpos < 0) {
-      xpos += selworld.size[0];
-    }
-    else if (xpos >= selworld.size[0]) {
-      xpos -= selworld.size[0];
-    }
-    if (ypos < 0) {
-      ypos = 0;
-    }
-    else if (ypos >= selworld.size[1]) {
-      ypos = selworld.size[1] - 1;
-    }
-    if (selworld.blocks[xpos][ypos] == 0)
-      selworld.blocks[xpos][ypos] = 2;
-    else
-      selworld.blocks[xpos][ypos] = 0;
-  }
   characters[0].attack = attacktime*fps;
   characters[0].cursprite = 4;
   if(mouseX < wDim0[0]/2)
@@ -581,7 +593,7 @@ function moveChars() {
           ch.speed[1] += speedjump*random(0,1);
 
         characters.forEach((ch2, ich2) => {
-          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange*3) {
+          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange*3 && ch2.life > 0) {
             ch.speed[0] += ch2.position[0] - ch.position[0];
             if (abs(ch.speed[0])> maxspeed)
               ch.speed[0] = maxspeed*ch.speed[0]/abs(ch.speed[0]);
@@ -718,6 +730,36 @@ function keyPressed() {
   else {
     jpressed = false;
   }
+  if (keyCode <= 57 && keyCode >= 48 && proMode) {
+    selectedblocktype = keyCode-48;
+  }
+}
+
+function mouseDraw() {
+  if (proMode && mouseIsPressed) {
+    let yrad = ((mouseX-wDim0[0]/2)**2 + (selworld.rad[0]+mouseY-cameraposition[1]-wDim0[1]/2)**2)**0.5;
+    let ypos = floor((selworld.rad[0]-yrad)/blocksize);
+    let xpos = floor((atan((mouseX-wDim0[0]/2)/yrad)*selworld.rad[0] + cameraposition[0])/blocksize);
+
+    if (xpos < 0) {
+      xpos += selworld.size[0];
+    }
+    else if (xpos >= selworld.size[0]) {
+      xpos -= selworld.size[0];
+    }
+    if (ypos < 0) {
+      ypos = 0;
+    }
+    else if (ypos >= selworld.size[1]) {
+      ypos = selworld.size[1] - 1;
+    }
+    if (mouseButton === RIGHT && selworld.blocks[xpos][ypos] != 0) {
+      selworld.blocks[xpos][ypos] = 0;
+    }
+    else if (mouseButton === LEFT && selworld.blocks[xpos][ypos] != selectedblocktype) {
+      selworld.blocks[xpos][ypos] = selectedblocktype;
+    }
+  }
 }
 
 function draw() {
@@ -732,6 +774,7 @@ function draw() {
     collectInputs();
 
     moveChars();
+    mouseDraw();
 
     drawWorld();
 
