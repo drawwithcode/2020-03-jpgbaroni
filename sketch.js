@@ -1,5 +1,6 @@
 let wDim0 = [0,0]; // Window dimension at starting time
 let fps = 12; // Frames per Second
+let backcolor = [0,0,100,255];
 
 let zoomscale = 3; // must be N
 let blocksize = 15*zoomscale; // Size of ambient block
@@ -16,7 +17,7 @@ let maxspeed = 8;
 let speedincrement = 1;
 let speedjump = 8;
 
-let regenHealth = 0.2/60; // Health regained per second
+let regenHealth = 0.5/60; // Health regained per second
 let attacktime = 0.4;
 let attackrange = 200;
 
@@ -176,6 +177,8 @@ function preload(){
    backimg.push(loadImage('./assets/images/back.png'));
    characters.push(new Character(true));
    characters.push(new Character(true,"guard",[888,555],true,-0.1));
+   characters.push(new Character(true,"donaldo",[34000,140],true,-0.01));
+   characters.push(new Character(true,"joebidet",[35000,140],true,-0.01));
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = loadJSON("./assets/baseworld.json"); // new World();
 
@@ -274,7 +277,7 @@ function drawWorld() {
   noStroke();
   translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-blocksize*selworld.size[1]/2);
   for(let rad = wDim0[0]+wDim0[1]; rad > 0; rad -= (wDim0[0]+wDim0[1])/12) {
-    fill(20,20,20+50*(1-rad/(wDim0[0]+wDim0[1])));
+    fill(backcolor[0],backcolor[1],backcolor[2]*(1-rad/(wDim0[0]+wDim0[1])));
     ellipse(0,0,rad*(1+0.1*sin(rad/5+frameCount/50)));
   }
   pop();
@@ -286,6 +289,17 @@ function drawWorld() {
   fill(0);
   ellipse(0,0,selworld.rad[1]*2);
   pop();
+
+  push();
+  fill(200,200,200,80);
+  noStroke();
+  for (var x = (wDim0[0]%100)/2; x < wDim0[0]; x+=100) {
+    for (var y = (wDim0[1]%100)/2; y < wDim0[1]; y+=100) {
+      ellipse(x,y,dist(x,y,mouseX,mouseY)**0.4);
+    }
+  }
+  pop();
+
   //rect();
   selworld.blocks.forEach((row, x) => {
     row.forEach((bl, y) => {
@@ -348,11 +362,19 @@ function mouseClicked() {
   // if no block is present
   //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
 }
+function mouseDragged() {
+
+}
+
 function mousePressed() {
+  backcolor = [50,0,100,255];
   characters[0].attack = attacktime*fps;
   characters[0].cursprite = 4;
   if(mouseX < wDim0[0]/2)
     characters[0].cursprite = 12;
+}
+function mouseReleased() {
+  backcolor = [0,0,100,255];
 }
 
 function sign(x) {
