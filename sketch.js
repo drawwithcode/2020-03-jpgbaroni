@@ -24,6 +24,9 @@ let attackrange = 200;
 const gravity = - 9.81*2; // gravity acceleration in blocks per second per second
 
 let deathScreen = 0; // number of seconds to show the death screen for
+let mic;
+let capture;
+let captureOn = false;
 
 let jpressed = false;
 
@@ -274,11 +277,12 @@ function drawWorld() {
   background(color(0));
 
   push();
-  noStroke();
+  //noStroke();
   translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-blocksize*selworld.size[1]/2);
   for(let rad = wDim0[0]+wDim0[1]; rad > 0; rad -= (wDim0[0]+wDim0[1])/12) {
+    stroke(backcolor[0]*2,backcolor[1]*2,2*backcolor[2]*(1-rad/(wDim0[0]+wDim0[1])),200);
     fill(backcolor[0],backcolor[1],backcolor[2]*(1-rad/(wDim0[0]+wDim0[1])));
-    ellipse(0,0,rad*(1+0.1*sin(rad/5+frameCount/50)));
+    ellipse(0,0,(0.8+mic.getLevel())*rad*(1+0.1*sin(rad/5+frameCount/50)));
   }
   pop();
   push();
@@ -351,6 +355,9 @@ function setup() {
   noStroke();
   angleMode(RADIANS);
   textFont("GrenzeGotisch");
+
+  mic = new p5.AudioIn();
+  mic.start();
 }
 
 function windowResized() {
@@ -806,4 +813,21 @@ function draw() {
     drawChars();
 
     drawStats();
+
+    if (proMode) {
+      if (!captureOn) {
+        capture = createCapture();
+        capture.hide();
+        captureOn = true;
+      }
+      push();
+      translate(capture.width,0);
+      scale(-1,1);
+      image(capture, -wDim0[0]+capture.width, wDim0[1]-wDim0[0]/3 * capture.height / capture.width, wDim0[0]/3, wDim0[0]/3 * capture.height / capture.width);
+      pop();
+    }
+    else {
+      captureOn = false;
+    }
+
 }
