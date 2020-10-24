@@ -10,6 +10,7 @@ let cameraposition = [0,0]; // camera position
 //let backimg = []; // Background image
 let characters = [];
 let selworld; // current selected world
+let selworld1; // current selected world
 
 let airresistance = -0.1;
 
@@ -34,11 +35,14 @@ let selectedblocktype = 2; // blocktype to edit the map with
 let proMode = false; // pro mode: edit map
 
 let loaded_sprites = {"supporter":undefined,"donaldo":undefined,"joebidet":undefined};
+let songs = ["Stars And Stripes Forever - The U.S. Army Band.mp3","The Thunderer - The U.S. Army Band.mp3","Washington Post - The U.S. Army Band.mp3"];
+let loadedSongs;
+let analyzer;
 
 // axes are cartesian-like
 
 class World { // The Map of the game
-  constructor(name = "00 Intro", size = [800,16]) {
+  constructor(name = "00 Intro", size = [400,32]) {
     this.name = name;
     this.size = size; // size in blocks
     this.rad = [blocksize*size[0]/2/PI,blocksize*(size[0]/2/PI-size[1])]; // Outer and Inner Radius
@@ -194,11 +198,27 @@ function preload(){
      loaded_sprites[ls] = new SpriteLoader(ls);
    }
    //img = loadImage('/assets/images/giorgioinnocenti.png');
-   selworld = loadJSON("./assets/baseworld.json"); // new World();
-
+   selworld = loadJSON("./assets/usa.json");
+   //selworld =  new World();
+   loadedSong = loadSound("./assets/songs/"+songs[floor(random(0,songs.length))]);
 }
 
 function setup() {
+
+  /*selworld1.blocks.forEach((row, x) => {
+    row.forEach((bl, y) => {
+      if (x < 180) {
+        selworld.blocks[x][y] = bl;
+      }
+      else if (x > selworld1.size[0]-220) {
+        selworld.blocks[selworld.size[0]-(selworld1.size[0]-x)][y] = bl;
+      }
+    });
+  });*/
+  analyzer = new p5.Amplitude();
+  analyzer.setInput(loadedSong);
+  loadedSong.play();
+  loadedSong.setVolume(0.1);
   for (ls in loaded_sprites) {
     loaded_sprites[ls].colorspritepixels([20,20,200]);
   }
@@ -234,8 +254,8 @@ function drawBackground(backimage) {
 
 function blockInScreen(x,y) {
   let result = true;
-  let xmin = (cameraposition[0]-1.2*wDim0[0]/2)/blocksize;
-  let xmax = (cameraposition[0]+1.2*wDim0[0]/2)/blocksize;
+  let xmin = (cameraposition[0]-1.5*wDim0[0]/2)/blocksize;
+  let xmax = (cameraposition[0]+1.5*wDim0[0]/2)/blocksize;
   if (x < xmin || x > xmax) {
     result = false;
   }
@@ -255,7 +275,7 @@ function drawBlock(x,y,type=1) {
     push();
     switch (type) {
       case 2:  // Cement, gray
-        fill(color(90,90,90,150));
+        fill(color(90,90,90,200));
         stroke(color(60,60,60,255));
         break;
       case 3:  // Yellow
@@ -297,7 +317,15 @@ function drawBlock(x,y,type=1) {
     strokeWeight(1.5);
     translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
     rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
-    rect(-blocksize/2,selworld.rad[0]-pos[1]-blocksize/2,blocksize,blocksize);
+    //rect(-blocksize/2,selworld.rad[0]-pos[1]-blocksize/2,blocksize,blocksize);
+    let sctop = yscaling(pos[1]+blocksize/2);
+    let scbtm = yscaling(pos[1]-blocksize/2);
+    beginShape();
+    vertex(-blocksize/2*sctop, selworld.rad[0]-pos[1]-blocksize/2);
+    vertex(blocksize/2*sctop, selworld.rad[0]-pos[1]-blocksize/2);
+    vertex(blocksize/2*scbtm, selworld.rad[0]-pos[1]+blocksize/2);
+    vertex(-blocksize/2*sctop, selworld.rad[0]-pos[1]+blocksize/2);
+    endShape(CLOSE);
     pop();
   }
   /*
@@ -311,7 +339,7 @@ function drawBlock(x,y,type=1) {
 
 function drawWorld() {
   background(color(0));
-
+  /* // Boring circles
   push();
   //noStroke();
   let micscale = 0;
@@ -324,6 +352,8 @@ function drawWorld() {
     ellipse(0,0,(1 - micscale)*rad*(1+0.1*sin(rad/5+frameCount/50)));
   }
   pop();
+  */
+
   push();
   noStroke();
   translate(wDim0[0]/2,wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
@@ -334,13 +364,34 @@ function drawWorld() {
   pop();
 
   push();
-  fill(200,200,200,80);
+  translate(0,cameraposition[1]/2-blocksize*selworld.size[1]/2);
   noStroke();
-  for (var x = (wDim0[0]%100)/2; x < wDim0[0]; x+=100) {
-    for (var y = (wDim0[1]%100)/2; y < wDim0[1]; y+=100) {
-      ellipse(x,y,dist(x,y,mouseX,mouseY)**0.4);
+  let hn = 1.5*blocksize*selworld.size[1];
+  let hn1 = hn;
+  for (var i = 0; i < 13; i++) {
+    if (i%2 == 0) {
+      fill(255,255,255,255*((12-i)/12)**1.5);
+    }
+    else {
+      fill(255,20,20,(55+200*noise(0,i*hn/13,frameCount/fps))*((12-i)/12)**1.5);
+    }
+    rect(0,i*hn/13,wDim0[0],hn/13);
+  }
+  for (var i = 0; i < 7; i++) {
+    fill(20*((12-i)/12)**2,20*((12-i)/12)**2,150*((12-i)/12)**1.5,255);
+    rect(0,i*hn/13,wDim0[0]/2,hn/13+1);
+  }
+  hn *= 7/13;
+  //fill(20,20,150,255);
+  //rect(0,0,wDim0[0]/2,hn);
+  fill(255,255,255,200);
+  for (var x =  wDim0[0]/2/11; x < (wDim0[0]/2/11)*10; x+=(wDim0[0]/2/11)) {
+    for (var y = hn/6; y < hn; y+=(hn/6)) {
+      ellipse(x,y,dist(x,y,mouseX,mouseY)**0.4*noise(x,y,frameCount/fps));
     }
   }
+  //fill(200,200,200,100);
+  //rect(0,0,wDim0[0],hn1);
   pop();
 
   //rect();
@@ -357,7 +408,8 @@ function drawsprite(sprite,pos) {
   push();
   translate(wDim0[0]/2, wDim0[1]/2+cameraposition[1]-selworld.rad[0]);
   rotate(-(pos[0]-cameraposition[0])/selworld.rad[0]);
-  image(sprite,-sprite.width/2,selworld.rad[0]-pos[1]-sprite.height/2);
+  let sc = (1+yscaling(pos[1]))/2; // a softer scale
+  image(sprite,-sprite.width/2,selworld.rad[0]-pos[1]-sprite.height/2,sc*sprite.width,sprite.height);
   pop();
 }
 
@@ -490,7 +542,7 @@ function moveChars() {
   characters.forEach((ch, ic) => {
     if(ch.display) {
       let presentblocks = findOverBlocks(ch.position,ch.blocks);
-      if (ch.hasweight && ! hasBlockUnder(presentblocks,ch.position[1])) { // falling
+      if (ch.hasweight && (!hasBlockUnder(presentblocks,ch.position[1]) || (ch.position[1]-ch.blocks[1]*blocksize/2 < 0))) { // falling
         ch.speed[1] += airresistance*ch.speed[1]/fps+gravity/fps;
       }
       if(ch.speed[0] != 0 || ch.speed[1] != 0) { // physics
@@ -690,7 +742,7 @@ function collectInputs() {
       characters[0].cursprite = 7;
     else
       characters[0].cursprite = 15;*/
-    if (characters[0].speed[1] < maxspeed && blockundernow){
+    if (characters[0].speed[1] < maxspeed && blockundernow && (characters[0].position[1]-characters[0].blocks[1]*blocksize/2) >= 0){
       characters[0].speed[1] += speedjump;
     }
   }
@@ -714,14 +766,18 @@ function collectInputs() {
   }
 }
 
+function yscaling(ypos) { // returns the horizontal scaling based on y position
+  return (selworld.rad[0]-ypos)/selworld.rad[0];
+}
+
 function drawStats() {
 
   if (deathScreen > 0) {
     textAlign(CENTER,CENTER);
-    textSize(150 - 10*deathScreen/fps);
+    textSize(120 - 10*deathScreen/fps);
     fill(255,255,255,100 + 20*deathScreen/fps);
     stroke(0,0,0,100 + 20*deathScreen/fps);
-    text("You Died", wDim0[0]/2, wDim0[1]/2);
+    text("You Lost The Election", wDim0[0]/2, wDim0[1]/2);
     deathScreen--;
   }
 
