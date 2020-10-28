@@ -251,8 +251,6 @@ function setup() {
   });*/
   analyzer = new p5.Amplitude();
   analyzer.setInput(loadedSong);
-  loadedSong.play();
-  loadedSong.setVolume(0.1);
   for (ls in loaded_sprites) {
     loaded_sprites[ls].colorspritepixels();
   }
@@ -468,6 +466,8 @@ function mouseClicked() {
       sidechosen = 1;
     }
     charactersSetup();
+    loadedSong.play();
+    loadedSong.setVolume(0.1);
   }
 }
 function mouseDragged() {
