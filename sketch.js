@@ -34,10 +34,14 @@ let jpressed = false;
 let selectedblocktype = 2; // blocktype to edit the map with
 let proMode = false; // pro mode: edit map
 
-let loaded_sprites = {"supporter":undefined,"donaldo":undefined,"joebidet":undefined};
+let base_sprites = ["supporter","supporterf","donaldo","joebidet"];
+//let loaded_sprites = {"supporter":undefined,"supporterf":undefined,"donaldo":undefined,"joebidet":undefined};
+let loaded_sprites = {};
 let songs = ["Stars And Stripes Forever - The U.S. Army Band.mp3","The Thunderer - The U.S. Army Band.mp3","Washington Post - The U.S. Army Band.mp3"];
 let loadedSongs;
 let analyzer;
+
+let sidechosen = -1;
 
 // axes are cartesian-like
 
@@ -99,9 +103,12 @@ class Character { // Like a player class but cooler
   }*/
 }
 class SpriteLoader{ // Like a player class but cooler
-  constructor(name, spritefilesize = [8,2], blsize = [2,4], spritessize = [30,60]) { // number of sprites in the file
+  constructor(name, spritefile = undefined, spritefilesize = [8,2], blsize = [2,4], spritessize = [30,60]) { // number of sprites in the file
     this.name = name;
-    this.spritefile = loadImage('./assets/images/'+this.name+'/Player.png');
+    if (spritefile == undefined)
+      this.spritefile = loadImage('./assets/images/'+this.name+'/Player.png');
+    else
+      this.spritefile = spritefile;
     this.spritefilesize = [spritefilesize[0],spritefilesize[1]];
     this.spritessize = [spritessize[0],spritessize[1]];
     this.sprites = [];
@@ -109,10 +116,21 @@ class SpriteLoader{ // Like a player class but cooler
     this.head = undefined;
   }
 
-  colorspritepixels(playercolor=[106,53,53]) { // Make transparency and colours the characters
+  colorspritepixels(playercolor = [106,53,53], skincolor = [235,219,216]) { // Make transparency and colours the characters
     //this.spritessize = [this.spritefile.width/this.spritefilesize[0],this.spritefile.height/this.spritefilesize[1]];
     let spritesn = [];
     let scaling = blocksize/this.spritessize[0]*2;
+
+    print(this.name);
+    if (this.name.substring(0, 3) == "dem")
+      playercolor = [20,20,200];
+    if (this.name.substring(0, 3) == "rep")
+      playercolor = [200,20,20];
+    if (this.name.substring(3, 5) == "br")
+      skincolor = [180,120,80];
+    if (this.name.substring(3, 5) == "bl")
+      skincolor = [80,50,30];
+
     this.spritefile.loadPixels();
     for (var y1 = 0; y1 < this.spritefile.height; y1 += this.spritessize[1]) {
       for (var x1 = 0; x1 < this.spritefile.width; x1 += this.spritessize[0]) {
@@ -143,6 +161,14 @@ class SpriteLoader{ // Like a player class but cooler
             }
             else if (pix[0] == 65 && pix[1] == 33 && pix[2] == 33) { // dark cloth color
               let darkcolor = color(playercolor[0]/1.1-40,playercolor[1]/1.1-40,playercolor[2]/1.1-40,255);
+              paintbigsquare(i, j,darkcolor);
+            }
+            else if ((pix[0] == 235 && pix[1] == 219 && pix[2] == 216) || (pix[0] == 242 && pix[1] == 232 && pix[2] == 230)) { //skincolor = [235,219,216]
+              let basecolor = color(skincolor[0],skincolor[1],skincolor[2],255);
+              paintbigsquare(i, j,basecolor);
+            }
+            else if (pix[0] == 205 && pix[1] == 166 && pix[2] == 158) { //skincolor = [235,219,216]
+              let darkcolor = color(skincolor[0]/1.1-40,skincolor[1]/1.1-40,skincolor[2]/1.1-40,255);
               paintbigsquare(i, j,darkcolor);
             }
             else  {
@@ -194,8 +220,16 @@ class Entity {
 function preload(){
    document.body.style.overflow = "hidden";
    //backimg.push(loadImage('./assets/images/back.png'));
-   for (ls in loaded_sprites) {
-     loaded_sprites[ls] = new SpriteLoader(ls);
+   for (bs in base_sprites) {
+     loaded_sprites[base_sprites[bs]] = new SpriteLoader(base_sprites[bs]);
+   }
+   let demrep = ["dem","rep","dembr","repbr","dembl","repbl"];
+   let f = "";
+   for (var i = 0; i < 2; i++) {
+     for (var dr in demrep) {
+       loaded_sprites[demrep[dr]+f] = new SpriteLoader(demrep[dr]+f,loaded_sprites[base_sprites[i]].spritefile);
+     }
+     f = "f";
    }
    //img = loadImage('/assets/images/giorgioinnocenti.png');
    selworld = loadJSON("./assets/usa.json");
@@ -220,16 +254,13 @@ function setup() {
   loadedSong.play();
   loadedSong.setVolume(0.1);
   for (ls in loaded_sprites) {
-    loaded_sprites[ls].colorspritepixels([20,20,200]);
+    loaded_sprites[ls].colorspritepixels();
   }
 
   cameraposition = [selworld.startingpoint[0],-selworld.startingpoint[1]+wDim0[1]/2];
   frameRate(fps);
   wDim0 = [windowWidth,windowHeight];
   createCanvas(wDim0[0],wDim0[1]);
-  characters.push(new Character(true,"supporter",[100,140],false,-0.1,0));
-  characters.push(new Character(true,"donaldo",[34000,140],true,-0.01));
-  characters.push(new Character(true,"joebidet",[35000,140],true,-0.01));
   /*for (var i = 0; i < 6; i++) {
     characters.push(new Character(true,"guard",[8400,450],true,-0.1,characters[1].sprites));
   }
@@ -429,8 +460,15 @@ function windowResized() {
 }
 
 function mouseClicked() {
-  // if no block is present
-  //selworld.blocks.push(new Block(floor(mouseX/blocksize),floor(mouseX/blocksize)));
+  if (sidechosen == -1) {
+    if (mouseX<wDim0[0]/2) {
+      sidechosen = 0;
+    }
+    else {
+      sidechosen = 1;
+    }
+    charactersSetup();
+  }
 }
 function mouseDragged() {
 
@@ -687,7 +725,7 @@ function moveChars() {
           ch.speed[1] += speedjump*random(0,1);
 
         characters.forEach((ch2, ich2) => {
-          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange*3 && ch2.life > 0) {
+          if (ch != ch2 && l2norm(ch.position,ch2.position) <= attackrange*3 && ch2.life > 0 && ch.faction != ch2.faction) {
             ch.speed[0] += ch2.position[0] - ch.position[0];
             if (abs(ch.speed[0])> maxspeed)
               ch.speed[0] = maxspeed*ch.speed[0]/abs(ch.speed[0]);
@@ -860,6 +898,52 @@ function mouseDraw() {
   }
 }
 
+function charactersSetup() {
+  let facts = ["dem","rep"];
+  let f = "", blr = "";
+  if (random(0,1) < 0.5) f = "f";
+  if (random(0,1) < 0.5) {
+    if (random(0,1) < 0.5) {
+      blr = "br";
+    }
+    else {
+      blr = "bl";
+    }
+  }
+  let en = 1-sidechosen;
+  characters.push(new Character(true,facts[sidechosen]+blr+f,[100,140],false,-0.1,sidechosen));
+  characters.push(new Character(true,facts[en],[floor(random(1000,4000)),600],true,-0.05,en));
+  characters.push(new Character(true,facts[en]+"br",[floor(random(1000,4000)),600],true,-0.05,en));
+  characters.push(new Character(true,facts[en]+"bl",[floor(random(1000,4000)),600],true,-0.05,en));
+  characters.push(new Character(true,facts[en]+"f",[floor(random(1000,4000)),600],true,-0.05,en));
+  characters.push(new Character(true,facts[en]+"brf",[floor(random(1000,4000)),600],true,-0.05,en));
+  characters.push(new Character(true,facts[en]+"blf",[floor(random(1000,4000)),600],true,-0.05,en));
+
+  characters.push(new Character(true,facts[en],[14550,600],true,-0.2,en));
+
+  characters.push(new Character(true,"donaldo",[floor(random(16000,18000)),800],true,-0.1,1));
+  characters.push(new Character(true,"joebidet",[floor(random(16000,18000)),800],true,-0.1,0));
+  for (var i = 0; i < 3; i++) {
+    characters.push(new Character(true,"donaldo",[floor(random(16000,18000)),140],true,-0.01,1));
+    characters.push(new Character(true,"joebidet",[floor(random(16000,18000)),140],true,-0.01,0));
+  }
+
+  for (var i = 0; i < 16; i++) {
+    f = "";
+    blr = "";
+    if (random(0,1) < 0.5) f = "f";
+    if (random(0,1) < 0.5) {
+      if (random(0,1) < 0.5) {
+        blr = "br";
+      }
+      else {
+        blr = "bl";
+      }
+    }
+    characters.push(new Character(true,facts[en]+blr+f,[floor(random(8200,12600)),140],true,-0.05,1));
+  }
+}
+
 function draw() {
     /*drawBackground(backimg[0]);
     characters[0].sprites.forEach((sp,isp) => {
@@ -869,36 +953,55 @@ function draw() {
       image(sp,blocksize*2*isp,450);
     });*/
     //characters[0].cursprite = int(2*frameCount/fps) % characters[0].sprites.length;
-    collectInputs();
+    if (sidechosen == -1) {
+      background(20,20,200);
+      noStroke();
+      fill(200,20,20);
+      rect(wDim0[0]/2,0,wDim0[0]/2,wDim0[1]);
+      textAlign(CENTER,CENTER);
+      textSize(60);
+      fill(255,255,255,255);
+      stroke(0,0,0,255);
+      text("Pick Your Side", wDim0[0]/2, wDim0[1]/4);
+      text("Dem", wDim0[0]/4, 200+wDim0[1]/2);
+      text("Rep", 3*wDim0[0]/4, 200+wDim0[1]/2);
+      let sprite1 = loaded_sprites["joebidet"].sprites[1];
+      image(sprite1,wDim0[0]/4-sprite1.width/2,-sprite1.height/2+wDim0[1]/2,sprite1.width,sprite1.height);
+      let sprite2 = loaded_sprites["donaldo"].sprites[9];
+      image(sprite2,3*wDim0[0]/4-sprite2.width/2,-sprite2.height/2+wDim0[1]/2,sprite2.width,sprite2.height);
 
-    moveChars();
-    mouseDraw();
-
-    drawWorld();
-
-    if (frameCount%fps == 0) // every second updates things in the world
-      updateWorld();
-
-    drawChars();
-
-    drawStats();
-
-    if (proMode) {
-      if (!captureOn) {
-        capture = createCapture();
-        capture.hide();
-        captureOn = true;
-        mic = new p5.AudioIn();
-        mic.start();
-      }
-      push();
-      translate(capture.width,0);
-      scale(-1,1);
-      image(capture, -wDim0[0]+capture.width, wDim0[1]-wDim0[0]/3 * capture.height / capture.width, wDim0[0]/3, wDim0[0]/3 * capture.height / capture.width);
-      pop();
     }
     else {
-      captureOn = false;
-    }
+      collectInputs();
 
+      moveChars();
+      mouseDraw();
+
+      drawWorld();
+
+      if (frameCount%fps == 0) // every second updates things in the world
+        updateWorld();
+
+      drawChars();
+
+      drawStats();
+
+      if (proMode) {
+        if (!captureOn) {
+          capture = createCapture();
+          capture.hide();
+          captureOn = true;
+          mic = new p5.AudioIn();
+          mic.start();
+        }
+        push();
+        translate(capture.width,0);
+        scale(-1,1);
+        image(capture, -wDim0[0]+capture.width, wDim0[1]-wDim0[0]/3 * capture.height / capture.width, wDim0[0]/3, wDim0[0]/3 * capture.height / capture.width);
+        pop();
+      }
+      else {
+        captureOn = false;
+      }
+    }
 }
