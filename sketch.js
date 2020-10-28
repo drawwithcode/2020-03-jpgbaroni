@@ -940,7 +940,7 @@ function charactersSetup() {
         blr = "bl";
       }
     }
-    characters.push(new Character(true,facts[en]+blr+f,[floor(random(8200,12600)),140],true,-0.05,1));
+    characters.push(new Character(true,facts[en]+blr+f,[floor(random(8200,12600)),140],true,-0.05,en));
   }
 }
 
